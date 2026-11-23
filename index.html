@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>FRAGMENTOS — Memoria, percepción y selección de la realidad</title>
+  <meta name="description" content="Experiencia interactiva con MediaPipe y OpenCV: selecciona la realidad con tus manos y captura fragmentos fotográficos analógicos.">
+  
+  <!-- Tipografías editoriales y técnicas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Aviso si se abre como archivo local file:// -->
+  <div id="fileWarningBanner" class="file-warning-banner" style="display:none;">
+    <div class="file-warning-content">
+      <span class="file-warning-tag">AVISO</span>
+      <div>
+        <strong>Página abierta directamente como archivo local (<code>file:///</code>).</strong>
+        <p>Por seguridad, Chrome y Edge desactivan la cámara web en este modo. Para activarla, ejecuta <code>iniciar.bat</code> en tu carpeta o usa <strong>Live Server</strong> en VS Code.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Destello de flash fotográfico -->
+  <div id="flashOverlay"></div>
+
+  <!-- PANTALLA INICIAL (LANDING) -->
+  <div id="landingOverlay" class="landing-overlay">
+    <div class="landing-content">
+      <div class="brand-tag">PROYECTO INTERACTIVO · VISIÓN ARTIFICIAL</div>
+      <h1 class="landing-title">FRAGMENTOS</h1>
+      <blockquote class="landing-quote">"No todo lo que vemos permanece. Elegimos qué conservar."</blockquote>
+      <p class="landing-desc">
+        Una experiencia interactiva que explora la memoria, la percepción y la selección de la realidad a través de una cámara. 
+        Tus dos manos crean el visor: la separación entre índice y pulgar modula el encuadre, la pinza simultánea acciona el obturador 
+        y OpenCV transforma el movimiento continuo en huellas de larga exposición sobre una galería de capturas instantáneas.
+      </p>
+
+      <div class="guide-grid">
+        <div class="guide-step">
+          <span class="step-num">01 / ENCUADRAR</span>
+          <div class="step-title">Índice y Pulgar</div>
+          <p class="step-text">El marco sigue a ambas manos; separar índice y pulgar amplía el tamaño de tu encuadre.</p>
+        </div>
+        <div class="guide-step">
+          <span class="step-num">02 / DISPARAR</span>
+          <div class="step-title">Gesto de Pinza</div>
+          <p class="step-text">Junta el índice y el pulgar de ambas manos al mismo tiempo para capturar el fragmento.</p>
+        </div>
+        <div class="guide-step">
+          <span class="step-num">03 / CONSERVAR</span>
+          <div class="step-title">Galería Cuadro por Cuadro</div>
+          <p class="step-text">Cada captura se revela en una hoja de contactos con emulsiones analógicas seleccionables.</p>
+        </div>
+      </div>
+
+      <div class="btn-shutter-wrapper">
+        <button id="btnStartExperience" class="btn-start-exp" type="button">
+          <span class="shutter-indicator-dot"></span>
+          <span>Comenzar experiencia</span>
+        </button>
+        <span class="landing-footnote">Requiere acceso a la cámara web frontal · Sin instalación</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- APLICACIÓN PRINCIPAL (3 PANTALLAS SIMULTÁNEAS) -->
+  <div class="app-container">
+    
+    <!-- Barra superior técnica -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="app-logo">FRAGMENTOS</span>
+        <span class="app-subtag">Visión Bimanual</span>
+      </div>
+
+      <!-- Selector de Película Analógica Antigua (Sin emojis) -->
+      <div class="film-selector-wrap" id="filmSelector">
+        <span class="film-label">PELÍCULA:</span>
+        <button class="film-pill is-active" data-film="kodachrome" title="Tonalidad cálida de 1970">KODACHROME 64</button>
+        <button class="film-pill" data-film="polaroid" title="Contraste suave instantáneo con sombras cian">POLAROID 600</button>
+        <button class="film-pill" data-film="trix" title="Blanco y negro plateado de alto contraste y grano">TRI-X 400</button>
+        <button class="film-pill" data-film="cinestill" title="Película cinemática nocturna con resplandor cálido">CINESTILL 800T</button>
+        <button class="film-pill" data-film="sepia" title="Tono sepia añejo con viñeteado de 1890">DAGUERROTIPO</button>
+      </div>
+
+      <!-- Acciones de control (Sin emojis) -->
+      <div class="header-actions">
+        <button id="btnManualShutter" class="btn-retro" title="Disparar captura (o presiona Espacio)">
+          <span>DISPARAR [ESPACIO]</span>
+        </button>
+        <button id="btnToggleSound" class="btn-retro" title="Activar/desactivar sonido de obturador">
+          <span id="soundText">AUDIO: ON</span>
+        </button>
+        <button id="btnViewExhibition" class="btn-retro accent" title="Ver exposición en pantalla completa">
+          <span>EXPOSICIÓN</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- GRILLA PANORÁMICA DE 3 PANTALLAS SIMULTÁNEAS -->
+    <main class="three-panel-grid">
+      
+      <!-- PANTALLA 1: SISTEMA A — SELECCIÓN BIMANUAL (MediaPipe) -->
+      <section class="panel-card" id="panelViewfinder">
+        <div class="panel-card-header">
+          <h2 class="panel-title">
+            <span class="panel-num">01</span> Visor Bimanual
+          </h2>
+          <span id="statusViewfinder" class="panel-badge">Iniciando…</span>
+        </div>
+
+        <div class="panel-card-body">
+          <div class="canvas-wrap">
+            <canvas id="viewfinderCanvas" width="640" height="480"></canvas>
+            
+            <div class="hud-layer">
+              <div style="display: flex; justify-content: space-between;">
+                <span class="hud-pill">VISOR · EXP 1/60s</span>
+                <span id="hudHandHint" class="hud-pill">BUSCANDO MANOS</span>
+              </div>
+              <div class="hud-bottom-bar">
+                <div class="hud-instruction">
+                  <p id="hudInstruction">Coloca ambas manos en el visor.</p>
+                  <div class="hud-cooldown">
+                    <div id="hudCooldownFill" class="hud-cooldown-fill"></div>
+                  </div>
+                </div>
+                <span id="hudFrameDim" class="hud-pill">MARCO: -- × --</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANTALLA 2: SISTEMA B — LARGA EXPOSICIÓN (OpenCV) -->
+      <section class="panel-card" id="panelMotion">
+        <div class="panel-card-header">
+          <h2 class="panel-title">
+            <span class="panel-num">02</span> Larga Exposición
+          </h2>
+          <span id="statusMotion" class="panel-badge">OpenCV.js</span>
+        </div>
+
+        <div class="panel-card-body">
+          <div class="canvas-wrap">
+            <canvas id="motionCanvas" width="640" height="480"></canvas>
+            
+            <div class="hud-layer">
+              <div style="display: flex; justify-content: space-between;">
+                <span class="hud-pill">MODO BULB · PERSISTENCIA</span>
+                <span id="hudMotionRate" class="hud-pill">ACTIVIDAD: 0%</span>
+              </div>
+              <div class="hud-bottom-bar">
+                <span class="hud-pill">HUELLAS DEL TIEMPO</span>
+                <span id="hudTrailsCount" class="hud-pill">ESTELAS: ACTIVAS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANTALLA 3: GALERÍA CUADRO POR CUADRO (HOJA DE CONTACTOS) -->
+      <section class="panel-card" id="panelGallery">
+        <div class="panel-card-header">
+          <h2 class="panel-title">
+            <span class="panel-num">03</span> Galería de Cuadros
+          </h2>
+          <span id="collageCounterTag" class="panel-badge">0 CAPTURAS</span>
+        </div>
+
+        <div class="panel-card-body">
+          <div id="gallerySpace" class="gallery-space">
+            <div id="galleryEmptyHint" class="gallery-empty-hint">
+              <span class="empty-tag">HOJA DE CONTACTOS</span>
+              <p class="empty-text">
+                Encuadra con ambas manos y junta índice y pulgar para revelar fotografías cuadro por cuadro.
+              </p>
+            </div>
+            <!-- Cuadrícula organizada cuadro por cuadro -->
+            <div id="framesGrid" class="frames-grid"></div>
+          </div>
+        </div>
+
+        <div class="gallery-toolbar">
+          <button id="btnClearCollage" class="btn-retro" title="Vaciar galería">
+            <span>LIMPIAR</span>
+          </button>
+          <button id="btnDownloadBoard" class="btn-retro accent" title="Descargar hoja completa en PNG">
+            <span>DESCARGAR PNG</span>
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- MODAL DE EXPOSICIÓN COMPLETA (LIGHTBOX) -->
+  <div id="exhibitionModal" class="exhibition-modal">
+    <div class="exhibition-toolbar">
+      <div class="exhibition-title-group">
+        <h2>HOJA DE CONTACTOS / EXPOSICIÓN</h2>
+        <p id="exhibitionSub">Colección de fragmentos conservados mediante encuadre bimanual</p>
+      </div>
+      <div class="exhibition-actions">
+        <button id="btnExportHighRes" class="btn-retro accent">
+          <span>DESCARGAR PNG</span>
+        </button>
+        <button id="btnClearInModal" class="btn-retro">
+          <span>LIMPIAR TODO</span>
+        </button>
+        <button id="btnCloseExhibition" class="btn-retro">
+          <span>VOLVER</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="exhibitionGallery" class="exhibition-gallery"></div>
+  </div>
+
+  <!-- ELEMENTOS OCULTOS DE CÓMPUTO Y CAPTURA -->
+  <video id="video" playsinline autoplay muted style="display:none;"></video>
+  <canvas id="cropCanvas" style="display:none;"></canvas>
+  <canvas id="exportCanvas" style="display:none;"></canvas>
+  <canvas id="opencvCanvas" style="display:none;"></canvas>
+
+  <!-- SCRIPT DE DETECCIÓN Y PRINCIPAL -->
+  <script>
+    if (window.location.protocol === "file:") {
+      var banner = document.getElementById("fileWarningBanner");
+      if (banner) banner.style.display = "block";
+    }
+  </script>
+  <script src="script.js"></script>
+</body>
+</html>
